@@ -1,4 +1,4 @@
-use Result;
+use {Error, Result};
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::Read;
@@ -22,17 +22,28 @@ pub struct AnnotatedGLSL {
 
 impl AnnotatedGLSL {
     pub fn load(path: &str, search_dirs: &[String]) -> Result<AnnotatedGLSL> {
-        let (mut file, found_path) = search_dirs.iter().fold(
-            File::open(&path).map(|f| (f, PathBuf::from(String::from(path)))),
-            |r, include_dir| {
-                r.or_else(|_| {
-                    let mut prefixed_path = PathBuf::new();
-                    prefixed_path.push(&include_dir);
-                    prefixed_path.push(&path);
-                    Ok((File::open(&prefixed_path)?, prefixed_path))
-                })
-            },
-        )?;
+        let (mut file, found_path) = search_dirs
+            .iter()
+            .fold(
+                File::open(&path).map(|f| (f, PathBuf::from(String::from(path)))),
+                |r, include_dir| {
+                    r.or_else(|_| {
+                        let mut prefixed_path = PathBuf::new();
+                        prefixed_path.push(&include_dir);
+                        prefixed_path.push(&path);
+                        Ok((File::open(&prefixed_path)?, prefixed_path))
+                    })
+                },
+            )
+            .map_err(|e| Error::FailedToOpen {
+                path: path.to_string(),
+                searched_dirs: {
+                    let mut dirs = search_dirs.to_vec();
+                    dirs.push(String::from("."));
+                    dirs
+                },
+                cause: e,
+            })?;
         let mut src = String::new();
         let _ = file.read_to_string(&mut src)?;
 
