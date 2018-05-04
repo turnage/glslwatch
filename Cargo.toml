@@ -1,7 +1,11 @@
 [package]
 name = "glslwatch"
 version = "0.1.0"
-authors = ["Payton Turnage <paytonturnage@gmail.com>"]
+authors = ["Payton Turnage <pt@paytonturnage.com>"]
+description = "A live glsl source tree."
+license = "GPLv3"
+license-file = "license"
+maintenance = { status = "passively-maintained" }
 
 [dependencies]
 failure = "0.1"
