@@ -37,10 +37,10 @@ extern crate rpds;
 mod preprocess;
 
 use failure::Fail;
-use std::path::Path;
-use std::fmt::{Display, Formatter};
-use std::collections::HashMap;
 use rpds::List;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::path::Path;
 
 use preprocess::AnnotatedGLSL;
 
@@ -122,6 +122,14 @@ impl GLSLTree {
     /// If an include is ambiguous, the first file found will be loaded, so take care of your
     /// include directory order if this applies to you.
     pub fn new<P: AsRef<Path>, P2: AsRef<Path>>(path: P, include_dirs: &[P2]) -> Result<Self> {
+        Self::with_default_version(path, include_dirs, 110)
+    }
+
+    pub fn with_default_version<P: AsRef<Path>, P2: AsRef<Path>>(
+        path: P,
+        include_dirs: &[P2],
+        default_version: usize,
+    ) -> Result<Self> {
         let root_path = match path.as_ref().to_str() {
             Some(s) => Ok(String::from(s)),
             None => Err(Error::MissingRoot),
@@ -145,7 +153,7 @@ impl GLSLTree {
             .unwrap()
             .version_pragma
             .map(|(_, v)| v)
-            .unwrap_or(110);
+            .unwrap_or(default_version);
         let rendered = vec![version]
             .into_iter()
             .map(|v| format!("#version {}", v))
