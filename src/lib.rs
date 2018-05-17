@@ -125,6 +125,10 @@ impl GLSLTree {
         Self::with_default_version(path, include_dirs, 110)
     }
 
+    /// Works like `new`, except overrides the default version. By default OpenGL assumes GLSL
+    /// source without a version pragma is version 110. You can pass another default version
+    /// to this constructor, but the root source's explicit version pragma if it has one will
+    /// always override the default.
     pub fn with_default_version<P: AsRef<Path>, P2: AsRef<Path>>(
         path: P,
         include_dirs: &[P2],

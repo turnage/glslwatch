@@ -1,6 +1,6 @@
 [package]
 name = "glslwatch"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Payton Turnage <pt@paytonturnage.com>"]
 description = "A live glsl source tree."
 license-file = "license"
