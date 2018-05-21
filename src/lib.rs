@@ -38,7 +38,7 @@ mod preprocess;
 
 use failure::Fail;
 use rpds::List;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
@@ -125,7 +125,7 @@ impl GLSLTree {
         Self::with_default_version(path, include_dirs, 110)
     }
 
-    /// Works like `new`, except overrides the default version. By default OpenGL assumes GLSL
+    /// Works like `new`, except sets the default version. By default OpenGL assumes GLSL
     /// source without a version pragma is version 110. You can pass another default version
     /// to this constructor, but the root source's explicit version pragma if it has one will
     /// always override the default.
@@ -151,7 +151,11 @@ impl GLSLTree {
             HashMap::new(),
         )?;
 
-        let lines = GLSLTree::render_node(&src_map.get(&root_path).unwrap(), &src_map);
+        let lines = GLSLTree::render_node(
+            &src_map.get(&root_path).unwrap(),
+            &src_map,
+            &mut HashSet::new(),
+        );
         let version: usize = src_map
             .get(&root_path)
             .unwrap()
@@ -253,13 +257,25 @@ impl GLSLTree {
         )
     }
 
-    fn render_node(src: &AnnotatedGLSL, src_map: &HashMap<String, AnnotatedGLSL>) -> Vec<String> {
+    fn render_node(
+        src: &AnnotatedGLSL,
+        src_map: &HashMap<String, AnnotatedGLSL>,
+        seen: &mut HashSet<String>,
+    ) -> Vec<String> {
         src.lines
             .iter()
             .enumerate()
             .map(|(i, line)| {
-                if let Some(ref src) = src.includes.get(&i).and_then(|path| src_map.get(path)) {
-                    Some(GLSLTree::render_node(src, src_map))
+                if let Some((path, ref src)) = src.includes
+                    .get(&i)
+                    .and_then(|path| src_map.get(path).map(|src| (path, src)))
+                {
+                    if seen.contains(path) {
+                        None
+                    } else {
+                        seen.insert(path.clone());
+                        Some(GLSLTree::render_node(src, src_map, seen))
+                    }
                 } else if let Some(true) = src.version_pragma.map(|(j, _)| j == i) {
                     None
                 } else {
