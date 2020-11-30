@@ -24,8 +24,8 @@
 //! ```
 //!
 
-extern crate failure;
 extern crate itertools;
+extern crate thiserror;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]
@@ -36,74 +36,36 @@ extern crate rpds;
 
 mod preprocess;
 
-use failure::Fail;
 use rpds::List;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
 use std::path::Path;
+use thiserror::Error;
 
 use preprocess::AnnotatedGLSL;
 
 type Result<T> = std::result::Result<T, Error>;
 
 /// An error loading or refreshing a GLSL source tree.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    Io(std::io::Error),
+    #[error("IO Error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Failed to open {path} after searching {searched_dirs:?}: {cause}")]
     FailedToOpen {
         path: String,
         searched_dirs: Vec<String>,
         cause: std::io::Error,
     },
+    #[error("There is a cycle through these imports: {0}")]
     Cycle(List<String>),
+    #[error("Versions {root_version:?} and {src_version:?} don't match. See {src_path}")]
     VersionMismatch {
         root_version: usize,
         src_version: usize,
         src_path: String,
     },
+    #[error("Root file is missing")]
     MissingRoot,
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
-        match *self {
-            Error::Io(ref e) => write!(f, "IO error of undecidede relevance: {}", e),
-            Error::FailedToOpen {
-                ref path,
-                ref searched_dirs,
-                ref cause,
-            } => write!(
-                f,
-                "Failed to open {}; searched in all of: {:?}; cause: {}",
-                path, searched_dirs, cause
-            ),
-            Error::Cycle(ref branch) => {
-                write!(f, "Source tree has a cycle in branch: {:?}", branch)
-            }
-            Error::VersionMismatch {
-                ref root_version,
-                ref src_version,
-                ref src_path
-            } => write!(f, "Version mismatch: root has version {} (110 is the default version) but {} has version {}", root_version, src_path, src_version),
-            Error::MissingRoot => write!(f, "No or empty path given for root shader."),
-        }
-    }
-}
-
-impl Fail for Error {
-    fn cause(&self) -> Option<&Fail> {
-        match *self {
-            Error::Io(ref e) => Some(e),
-            Error::FailedToOpen { ref cause, .. } => Some(cause),
-            _ => None,
-        }
-    }
 }
 
 /// An in-memory GLSL source tree.
@@ -186,7 +148,8 @@ impl GLSLTree {
     /// Returns whether one or more nodes of the cached source tree are out of sync with
     /// the filesystem.
     pub fn expired(&self) -> Result<bool> {
-        Ok(self.src_map
+        Ok(self
+            .src_map
             .iter()
             .map(|(_, ref src)| -> Result<bool> { src.expired() })
             .collect::<Result<Vec<bool>>>()?
@@ -212,7 +175,8 @@ impl GLSLTree {
             AnnotatedGLSL::load(path, &Vec::<String>::new())
         } else {
             AnnotatedGLSL::load(path, &include_dirs)
-        }.and_then(|src| match (version, src.version_pragma) {
+        }
+        .and_then(|src| match (version, src.version_pragma) {
             (Some(root_version), Some((_, src_version))) if root_version != src_version => {
                 Err(Error::VersionMismatch {
                     root_version,
@@ -231,7 +195,8 @@ impl GLSLTree {
         };
 
         let branch = branch.push_front(path.clone());
-        let include_files = src.includes
+        let include_files = src
+            .includes
             .clone()
             .into_iter()
             .map(|(_, v)| v)
@@ -266,7 +231,8 @@ impl GLSLTree {
             .iter()
             .enumerate()
             .map(|(i, line)| {
-                if let Some((path, ref src)) = src.includes
+                if let Some((path, ref src)) = src
+                    .includes
                     .get(&i)
                     .and_then(|path| src_map.get(path).map(|src| (path, src)))
                 {
